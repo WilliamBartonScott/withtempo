@@ -1,0 +1,890 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="WithTempo">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<title>WithTempo</title>
+<style>
+  :root { --bg:#000; --fg:#fff; --mut:#9a9aa0; --btn:#2c2c2e; --acc:#ffb23e; --ph:#9a9aa0; --w:380px; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; background:var(--bg); color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  body { min-height:100dvh; padding:env(safe-area-inset-top) 20px env(safe-area-inset-bottom); }
+
+  header { width:100%; max-width:var(--w); margin:0 auto; display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:8px; }
+  h1 { text-align:center; font-size:22px; letter-spacing:.01em; margin:24px 0 16px; font-weight:800; white-space:nowrap; }
+  .hl { display:flex; justify-content:flex-start; }
+  .hr { display:flex; justify-content:flex-end; gap:8px; }
+  .hbtn { width:38px; height:38px; border:0; border-radius:50%; background:var(--btn); color:var(--fg); padding:0;
+    display:grid; place-items:center; font-size:22px; line-height:1; }
+  .hbtn:active { background:#3d3d40; }
+  .hbtn.on { background:var(--acc); color:#1c1400; }
+  .hbtn svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .sw { display:none; height:38px; min-width:56px; padding:0 12px; border:0; border-radius:19px; background:var(--btn);
+    color:var(--acc); font-size:18px; font-weight:700; font-variant-numeric:tabular-nums; }
+
+  #setup, #live { width:100%; max-width:var(--w); margin:0 auto; }
+  .play { display:block; margin:6px auto 22px; width:120px; height:120px; border-radius:50%;
+    border:8px solid var(--btn); background:var(--acc); padding:0; }
+  .play svg { width:48px; height:48px; fill:#2c2c2e; }
+
+  .row { display:grid; grid-template-columns:1fr 64px 130px; align-items:center; gap:10px; margin:10px 0; font-size:24px; }
+  .lab { text-align:right; }
+  .val { text-align:center; font-variant-numeric:tabular-nums; }
+  .step { display:flex; background:var(--btn); border-radius:24px; overflow:hidden; }
+  .step button { flex:1; height:48px; border:0; background:transparent; color:var(--fg); font-size:28px; }
+  .step button:first-child { border-right:1px solid #555; }
+  .step button:active { background:#3d3d40; }
+  .dir { padding:8px 18px; border:0; border-radius:20px; background:var(--btn); color:var(--fg); font-size:24px; }
+  .dir.on { background:var(--acc); color:#1c1400; font-weight:700; }
+  .gap { height:18px; }
+  .psel { grid-column:2 / 4; position:relative; }
+  .psel select { -webkit-appearance:none; appearance:none; width:100%; height:48px; border:0; border-radius:24px;
+    background:var(--btn); color:var(--fg); font-size:19px; font-weight:600; padding:0 34px 0 18px;
+    text-align:center; text-align-last:center; }
+  .psel.on select { color:var(--acc); }
+  .psel::after { content:''; position:absolute; right:17px; top:50%; width:7px; height:7px; pointer-events:none;
+    border-right:2px solid #9a9aa0; border-bottom:2px solid #9a9aa0; transform:translateY(-70%) rotate(45deg); }
+  @media (max-width:359px) {
+    .row { grid-template-columns:1fr 44px 112px; font-size:21px; }
+    .dir { padding:8px 12px; font-size:21px; }
+  }
+
+  #live { display:none; text-align:center; min-height:90dvh; flex-direction:column; justify-content:center; }
+  body.running #setup, body.running header { display:none; }
+  body.running #live { display:flex; }
+  #big { font-size:22vw; font-weight:800; line-height:1; max-height:2.2em; }
+  #num { font-size:30vw; font-weight:800; color:var(--ph); line-height:1; min-height:1em; font-variant-numeric:tabular-nums; }
+  #rep { font-size:26px; color:var(--mut); margin:12px 0 20px; }
+  @media (min-width:500px) { #big{font-size:110px} #num{font-size:160px} }
+
+  .ctl { display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .pause { position:relative; width:168px; height:168px; border-radius:50%; border:0; background:transparent; padding:0;
+    display:grid; place-items:center; }
+  .rings { position:absolute; inset:0; width:100%; height:100%; transform:rotate(-90deg); transition:opacity .2s; }
+  .rings circle { fill:none; }
+  .rings .disc { fill:#141416; stroke:none; }
+  .rings .otrack { stroke:#1f1f22; stroke-width:5; }
+  .rings .oprog { stroke:var(--acc); stroke-width:5; stroke-dasharray:452.389; stroke-dashoffset:452.389; }
+  .rings .st { stroke:#2c2c2e; stroke-width:8; }
+  .rings .sp { stroke:var(--ph); stroke-width:8; }
+  body.paused .rings { opacity:.35; }
+  .pause .ico { position:relative; }
+  .pause .ico svg { width:44px; height:44px; fill:var(--fg); display:block; }
+  .stopbtn { border:0; background:var(--btn); color:#ff6b6b; border-radius:22px; padding:12px 30px; font-size:18px; font-weight:600; }
+  .stopbtn:active { background:#3d3d40; }
+
+  .modal { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:flex-end; justify-content:center; z-index:10; }
+  .modal.open { display:flex; }
+  .sheet { background:#1c1c1e; width:100%; max-width:480px; border-radius:20px 20px 0 0;
+    padding:20px 20px calc(20px + env(safe-area-inset-bottom)); max-height:90dvh; overflow:auto; }
+  .sheet h2 { margin:0 0 8px; font-size:22px; text-align:center; }
+  .sheet h3 { margin:20px 0 4px; font-size:13px; letter-spacing:.1em; text-transform:uppercase; color:var(--mut); font-weight:600; }
+  .sheet label, .srow { display:flex; justify-content:space-between; align-items:center; gap:12px; margin:14px 0; font-size:18px; }
+  .sheet input[type=checkbox] { width:26px; height:26px; accent-color:var(--acc); }
+  .sheet select { max-width:60%; background:var(--btn); color:var(--fg); border:0; border-radius:10px; padding:9px; font-size:15px; }
+  .mini { display:flex; align-items:center; background:var(--btn); border-radius:20px; overflow:hidden; }
+  .mini button { width:46px; height:40px; border:0; background:transparent; color:var(--fg); font-size:22px; }
+  .mini button { user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; touch-action:manipulation; }
+  .mini button:active { background:#3d3d40; }
+  .mini b { min-width:52px; text-align:center; font-weight:600; font-variant-numeric:tabular-nums; }
+  .sheet ul.hint { color:var(--mut); font-size:13px; line-height:1.45; margin:6px 0 18px; padding-left:18px; }
+  .sheet ul.hint li { margin:5px 0; }
+  .mbig { text-align:center; margin:10px 0 4px; }
+  .mbig b { display:block; font-size:84px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; transition:color .09s; }
+  .mbig b.hit { color:var(--acc); }
+  .mbig span { display:block; color:var(--mut); font-size:13px; letter-spacing:.12em; text-transform:uppercase; margin-top:6px; }
+  .mctl { display:flex; align-items:center; gap:12px; margin:18px 0 6px; }
+  .mstep { flex:none; width:46px; height:46px; border:0; border-radius:50%; background:var(--btn); color:var(--fg); font-size:26px; padding:0;
+    user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; touch-action:manipulation; }
+  .mstep:active { background:#3d3d40; }
+  .mctl input[type=range] { flex:1; min-width:0; height:32px; accent-color:var(--acc); }
+  .mplay { display:grid; place-items:center; margin:14px auto 22px; width:96px; height:96px; border-radius:50%;
+    border:8px solid var(--btn); background:var(--acc); padding:0; }
+  .mplay svg { width:38px; height:38px; fill:#2c2c2e; }
+  .reset { display:block; width:100%; height:46px; margin:0 0 12px; border:0; border-radius:14px; background:var(--btn); color:#ff6b6b; font-size:16px; font-weight:600; }
+  .reset:active { background:#3d3d40; }
+  .reset.armed { background:#ff6b6b; color:#1c0000; }
+  .actrow { display:flex; justify-content:center; margin:20px 0 6px; }
+  .act { border:0; background:var(--btn); color:var(--acc); border-radius:20px; padding:11px 20px; font-size:16px; font-weight:600; }
+  .act:active { background:#3d3d40; }
+  .act.del { color:#ff6b6b; }
+  .act.del.armed { background:#ff6b6b; color:#1c0000; }
+  #smodal { align-items:flex-start; padding:max(env(safe-area-inset-top), 12px) 16px 0; }
+  #smodal .sheet { border-radius:20px; margin-top:8dvh; max-height:none; }
+  .fld { display:block; width:100%; background:var(--btn); color:var(--fg); border:0; border-radius:12px; padding:13px 14px; font-size:18px; margin:14px 0 6px; }
+  .sinfo { color:var(--mut); font-size:13px; margin:6px 0 2px; min-height:1.4em; }
+  .serr { color:#ff6b6b; font-size:14px; margin:0 0 12px; min-height:1.3em; }
+  .done { display:block; width:100%; height:50px; border:0; border-radius:14px; background:var(--acc); color:#1c1400; font-size:18px; font-weight:700; }
+</style>
+</head>
+<body>
+<header>
+  <div class="hl"><button class="sw" id="sw" aria-label="Rest stopwatch, tap to clear">0:00</button></div>
+  <h1>WithTempo</h1>
+  <div class="hr">
+    <button class="hbtn" id="met" aria-label="Metronome"><svg viewBox="0 0 24 24"><path d="M8.5 3h7l4 18h-15z"/><path d="M12 17l3.5-9.5"/></svg></button>
+    <button class="hbtn" id="cog" aria-label="Settings">&#9881;&#xFE0E;</button>
+  </div>
+</header>
+
+<div id="setup">
+  <button class="play" id="play" aria-label="Start"><svg viewBox="0 0 24 24"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></svg></button>
+  <div id="rows"></div>
+</div>
+
+<div id="live">
+  <div id="big"></div>
+  <div id="num"></div>
+  <div id="rep"></div>
+  <div class="ctl">
+    <button class="pause" id="pause" aria-label="Pause">
+      <svg class="rings" viewBox="0 0 160 160">
+        <circle class="disc" cx="80" cy="80" r="50"/>
+        <circle class="otrack" cx="80" cy="80" r="72"/>
+        <circle class="oprog" id="oprog" cx="80" cy="80" r="72"/>
+        <g id="segs"></g>
+      </svg>
+      <span class="ico" id="pico"></span>
+    </button>
+    <button class="stopbtn" id="stop">Stop</button>
+  </div>
+</div>
+
+<div class="modal" id="modal">
+  <div class="sheet">
+    <h2>Settings</h2>
+    <h3>Counting</h3>
+    <div class="srow"><span>BPM</span><span class="mini"><button id="bpmDn" aria-label="Slower">-</button><b id="bpmVal"></b><button id="bpmUp" aria-label="Faster">+</button></span></div>
+    <label>Beat tick <input type="checkbox" id="tickOn"></label>
+    <label>Voice count <input type="checkbox" id="voiceOn"></label>
+    <label>Beat sound <select id="sound"></select></label>
+    <label>Voice <select id="voice"></select></label>
+    <h3>Rep cues</h3>
+    <label>Call out reps <input type="checkbox" id="cueRep"></label>
+    <label>Halfway cue <input type="checkbox" id="cueHalf"></label>
+    <label>Last rep cue <input type="checkbox" id="cueLast"></label>
+    <h3>How it works</h3>
+    <ul class="hint">
+      <li>Phase lengths are in beats. At 60 BPM, 1 beat = 1 second.</li>
+      <li>Each rep runs down, hold, up, hold. Tap Down or Up to choose which one it starts on.</li>
+      <li>Rep and cue calls play between beats.</li>
+      <li>Pausing restarts the current rep after a 3-2-1.</li>
+      <li>After a set, the stopwatch times your rest. Tap it to clear.</li>
+      <li>The metronome stops when you close it and uses the BPM from settings.</li>
+      <li>Turn off silent mode so beats play on iPhone.</li>
+      <li>For more voices: Settings, Accessibility, Spoken Content, Voices.</li>
+    </ul>
+    <button class="reset" id="reset">Reset settings</button>
+    <button class="done" id="done">Done</button>
+  </div>
+</div>
+
+<div class="modal" id="mmodal">
+  <div class="sheet">
+    <h2>Metronome</h2>
+    <div class="mbig"><b id="mbpm">60</b><span>BPM</span></div>
+    <div class="mctl">
+      <button class="mstep" id="mDn" aria-label="Slower">-</button>
+      <input type="range" id="mSlide" min="20" max="240" step="1" aria-label="BPM">
+      <button class="mstep" id="mUp" aria-label="Faster">+</button>
+    </div>
+    <button class="mplay" id="mPlay" aria-label="Play or pause"></button>
+    <button class="done" id="mDone">Done</button>
+  </div>
+</div>
+
+<div class="modal" id="smodal">
+  <div class="sheet">
+    <h2>Save exercise</h2>
+    <input class="fld" id="sname" type="text" maxlength="24" placeholder="Exercise name" autocomplete="off" autocapitalize="words" enterkeyhint="done" aria-label="Exercise name">
+    <p class="sinfo" id="sinfo"></p>
+    <p class="serr" id="serr"></p>
+    <button class="done" id="sSave">Save</button>
+    <button class="reset" id="sCancel" style="margin:12px 0 0;color:var(--fg)">Cancel</button>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const defaults = { reps:8, delay:5, bpm:60, pd:3, hd:2, pu:3, hu:2, startDown:true,
+  voice:true, tick:true, voiceName:'', voiceURI:'', sound:'beep', cueRep:false, cueHalf:true, cueLast:true };
+let c = Object.assign({}, defaults);
+try { Object.assign(c, JSON.parse(localStorage.getItem('tempo-cfg') || '{}')); } catch (e) {}
+// migrate older saved settings, which stored phases by position instead of by movement
+if (c.p1 !== undefined) {
+  if (c.downFirst === false) { c.pu = c.p1; c.hu = c.h1; c.pd = c.p2; c.hd = c.h2; c.startDown = false; }
+  else { c.pd = c.p1; c.hd = c.h1; c.pu = c.p2; c.hu = c.h2; c.startDown = true; }
+  delete c.p1; delete c.h1; delete c.p2; delete c.h2; delete c.downFirst;
+}
+// saved exercises: tidy anything unexpected in storage
+{
+  const cl = (v, a, b) => Math.min(b, Math.max(a, Math.round(v)));
+  c.saved = (Array.isArray(c.saved) ? c.saved : [])
+    .filter(x => x && typeof x.id === 'string' && /^[a-z0-9]+$/i.test(x.id) && typeof x.name === 'string' && x.name.trim() &&
+      [x.pd, x.hd, x.pu, x.hu].every(Number.isFinite))
+    .slice(0, 30)
+    .map(x => ({ id: x.id, name: x.name.trim().slice(0, 24), pd: cl(x.pd, 1, 20), hd: cl(x.hd, 0, 20), pu: cl(x.pu, 1, 20), hu: cl(x.hu, 0, 20), startDown: !!x.startDown }));
+}
+function save() { try { localStorage.setItem('tempo-cfg', JSON.stringify(c)); } catch (e) {} }
+
+// key, label, min, max, step
+const rows = [
+  ['reps','Reps',1,100,1],
+  ['delay','Start Delay',0,30,1],
+  null,
+  { preset: true },
+  ['pd','Down',1,20,1],
+  ['hd','Hold',0,20,1],
+  ['pu','Up',1,20,1],
+  ['hu','Hold',0,20,1]
+];
+
+// Starting points based on common tempo prescriptions. They set the four phase lengths (in beats) and which movement opens each rep. Reps and start delay are left alone.
+const PRESETS = [
+  { name:'Pull Ups', pd:3, hd:1, pu:2, hu:1, startDown:false },
+  { name:'Dips',     pd:3, hd:1, pu:2, hu:1, startDown:true  },
+  { name:'Rows',     pd:3, hd:0, pu:2, hu:1, startDown:false },
+  { name:'Push Ups', pd:3, hd:1, pu:1, hu:0, startDown:true  },
+  { name:'Squats',   pd:3, hd:2, pu:1, hu:0, startDown:true  }
+];
+// Custom stays selected once you edit any of the four tempo controls, even if the numbers happen to equal a preset
+const matches = p => c.pd === p.pd && c.hd === p.hd && c.pu === p.pu && c.hu === p.hu && c.startDown === p.startDown;
+const esc = x => String(x).replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+// exercise values are 'custom', a built-in index like '2', or 'u:<id>' for one you saved
+function lookup(v) {
+  v = String(v);
+  if (v === 'custom') return c.custom;
+  if (v.indexOf('u:') === 0) return c.saved.find(x => x.id === v.slice(2));
+  return PRESETS[Number(v)];
+}
+function curExercise() {
+  const v = c.preset === undefined ? 'custom' : String(c.preset);
+  return v !== 'custom' && lookup(v) ? v : 'custom';
+}
+// remembers the last hand-edited tempo so choosing Custom brings it back
+function snap() { c.custom = { pd:c.pd, hd:c.hd, pu:c.pu, hu:c.hu, startDown:c.startDown }; }
+
+function render() {
+  const box = $('#rows');
+  box.innerHTML = '';
+  rows.forEach(r => {
+    if (!r) { box.insertAdjacentHTML('beforeend', '<div class="gap"></div>'); return; }
+    if (r.preset) {
+      const cur = curExercise();
+      const opt = (v, label) => '<option value="' + v + '"' + (v === cur ? ' selected' : '') + '>' + esc(label) + '</option>';
+      const opts = PRESETS.map((p, i) => opt(String(i), p.name)).join('') +
+        (c.saved.length ? '<optgroup label="Saved">' + c.saved.map(x => opt('u:' + x.id, x.name)).join('') + '</optgroup>' : '') +
+        opt('custom', 'Custom');
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = '<div class="lab">Exercise</div><div class="psel' + (cur !== 'custom' ? ' on' : '') + '"><select id="preset" aria-label="Exercise">' + opts + '</select></div>';
+      box.appendChild(row);
+      return;
+    }
+    const [k, l] = r;
+    let label = l;
+    if (k === 'pd' || k === 'pu') {
+      const on = (k === 'pd') === c.startDown;
+      label = '<button class="dir' + (on ? ' on' : '') + '" data-start="' + k + '">' + l + '</button>';
+    }
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML =
+      '<div class="lab">' + label + '</div>' +
+      '<div class="val">' + c[k] + '</div>' +
+      '<div class="step"><button data-k="' + k + '" data-d="-1">-</button><button data-k="' + k + '" data-d="1">+</button></div>';
+    box.appendChild(row);
+  });
+  const cur = curExercise();
+  const act = document.createElement('div');
+  act.className = 'actrow';
+  if (cur === 'custom') act.innerHTML = '<button class="act" id="saveEx">Save as exercise</button>';
+  else if (cur.indexOf('u:') === 0) {
+    const armed = delArmed === cur.slice(2);
+    act.innerHTML = '<button class="act del' + (armed ? ' armed' : '') + '" id="delEx">' + (armed ? 'Tap again to delete' : 'Delete exercise') + '</button>';
+  }
+  if (act.innerHTML) box.appendChild(act);
+}
+let delArmed = '', delTimer = 0;
+function syncSettings() {
+  $('#voiceOn').checked = c.voice;
+  $('#tickOn').checked = c.tick;
+  $('#cueRep').checked = c.cueRep;
+  $('#cueHalf').checked = c.cueHalf;
+  $('#cueLast').checked = c.cueLast;
+  $('#bpmVal').textContent = c.bpm;
+}
+
+$('#rows').addEventListener('click', e => {
+  const t = e.target.closest('button');
+  if (!t) return;
+  if (t.id === 'saveEx') { openSave(); return; }
+  if (t.id === 'delEx') {
+    const id = curExercise().slice(2);
+    if (delArmed !== id) {
+      delArmed = id;
+      clearTimeout(delTimer);
+      delTimer = setTimeout(() => { delArmed = ''; render(); }, 3000);
+      render();
+      return;
+    }
+    clearTimeout(delTimer);
+    delArmed = '';
+    c.saved = c.saved.filter(x => x.id !== id);
+    c.preset = 'custom';
+    snap(); // the numbers stay as they are, they just become Custom
+    save(); render();
+    return;
+  }
+  if (t.dataset.start) { c.startDown = t.dataset.start === 'pd'; c.preset = 'custom'; snap(); }
+  else if (t.dataset.k) {
+    const r = rows.find(x => x && x[0] === t.dataset.k);
+    c[r[0]] = Math.min(r[3], Math.max(r[2], c[r[0]] + r[4] * Number(t.dataset.d)));
+    if (['pd', 'hd', 'pu', 'hu'].includes(r[0])) { c.preset = 'custom'; snap(); }
+  }
+  save(); render();
+});
+$('#rows').addEventListener('change', e => {
+  if (e.target.id !== 'preset') return;
+  const v = e.target.value;
+  const src = lookup(v);
+  c.preset = v;
+  delArmed = '';
+  if (src) { c.pd = src.pd; c.hd = src.hd; c.pu = src.pu; c.hu = src.hu; c.startDown = src.startDown; }
+  save(); render();
+});
+
+// Save an exercise: name it, and the four tempo numbers plus the start phase are stored (reps and start delay are not)
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const cleanName = () => $('#sname').value.trim().replace(/\s+/g, ' ');
+const sameName = n => c.saved.find(x => x.name.toLowerCase() === n.toLowerCase());
+function sinfo() {
+  const n = cleanName();
+  $('#sinfo').textContent = n && sameName(n)
+    ? 'This will replace your saved "' + sameName(n).name + '".'
+    : 'Tempo ' + c.pd + '-' + c.hd + '-' + c.pu + '-' + c.hu + ' (down, hold, up, hold), starts on ' + (c.startDown ? 'down' : 'up') + '.';
+}
+function openSave() {
+  $('#sname').value = '';
+  $('#serr').textContent = '';
+  sinfo();
+  $('#smodal').classList.add('open');
+  setTimeout(() => $('#sname').focus(), 60);
+}
+function closeSave() { $('#smodal').classList.remove('open'); $('#sname').blur(); }
+function doSave() {
+  const name = cleanName();
+  const low = name.toLowerCase();
+  const err = m => { $('#serr').textContent = m; };
+  if (!name) return err('Give it a name.');
+  if (low === 'custom' || PRESETS.some(p => p.name.toLowerCase() === low)) return err('That name is already a built-in exercise.');
+  const rec = { pd: c.pd, hd: c.hd, pu: c.pu, hu: c.hu, startDown: c.startDown };
+  const old = sameName(name);
+  let id;
+  if (old) { Object.assign(old, rec); id = old.id; }
+  else {
+    if (c.saved.length >= 30) return err('You can save up to 30 exercises. Delete one first.');
+    id = newId();
+    c.saved.push(Object.assign({ id: id, name: name }, rec));
+  }
+  c.preset = 'u:' + id;
+  save(); closeSave(); render();
+}
+$('#sname').addEventListener('input', () => { $('#serr').textContent = ''; sinfo(); });
+$('#sname').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doSave(); } });
+$('#sSave').onclick = doSave;
+$('#sCancel').onclick = closeSave;
+$('#smodal').addEventListener('click', e => { if (e.target.id === 'smodal') closeSave(); });
+// One BPM shared by the tempo count and the metronome
+function setBpm(v) {
+  c.bpm = Math.min(240, Math.max(20, Math.round(v)));
+  save();
+  $('#bpmVal').textContent = c.bpm;
+  $('#mbpm').textContent = c.bpm;
+  $('#mSlide').value = c.bpm;
+}
+holdRepeat($('#bpmDn'), -1); // one beat per tap, hold to keep going
+holdRepeat($('#bpmUp'), 1);
+
+// Audio context
+let ctx, timer, nextTime, idx, beats, spb, setTotal = 1, running = false, paused = false;
+let uiTimers = [], wake = null, cur = null, shownIdx = 0, raf = 0, lastOp = 0, reachedSet = false;
+function ensureCtx() {
+  ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+  if (ctx.state === 'suspended') ctx.resume();
+}
+
+// Beat sounds. m = pitch multiplier, v = volume multiplier
+let noiseBuf;
+function noise() {
+  if (!noiseBuf) {
+    noiseBuf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.2), ctx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  return noiseBuf;
+}
+function env(t, dur, vol) {
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.003);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  g.connect(ctx.destination);
+  return g;
+}
+function tone(t, type, f, dur, vol, fEnd) {
+  const o = ctx.createOscillator();
+  o.type = type;
+  o.frequency.setValueAtTime(f, t);
+  if (fEnd) o.frequency.exponentialRampToValueAtTime(fEnd, t + dur);
+  o.connect(env(t, dur, vol));
+  o.start(t);
+  o.stop(t + dur + 0.02);
+}
+const SOUNDS = {
+  beep:    { name: 'Beep',            play: (t, m, v) => tone(t, 'sine', 700 * m, 0.09, 0.5 * v) },
+  click:   { name: 'Metronome click', play: (t, m, v) => tone(t, 'square', 1200 * m, 0.025, 0.22 * v) },
+  wood:    { name: 'Wood block',      play: (t, m, v) => tone(t, 'triangle', 900 * m, 0.07, 0.8 * v, 500 * m) },
+  hat:     { name: 'Hi-hat',          play: (t, m, v) => {
+              const s = ctx.createBufferSource();
+              s.buffer = noise();
+              const hp = ctx.createBiquadFilter();
+              hp.type = 'highpass';
+              hp.frequency.value = 6500 * Math.min(m, 1.3);
+              s.connect(hp);
+              hp.connect(env(t, 0.05, 0.7 * v));
+              s.start(t); s.stop(t + 0.08);
+            } },
+  thump:   { name: 'Low thump',       play: (t, m, v) => tone(t, 'sine', 180 * m, 0.14, 0.9 * v, 50) },
+  cowbell: { name: 'Cowbell',         play: (t, m, v) => {
+              tone(t, 'square', 560 * m, 0.18, 0.18 * v);
+              tone(t, 'square', 845 * m, 0.18, 0.18 * v);
+            } }
+};
+if (!SOUNDS[c.sound]) c.sound = 'beep';
+
+function playSound(t, kind) {
+  // kind: 'lead', 'normal', 'accent', 'end'
+  const m = kind === 'lead' ? 0.75 : kind === 'accent' ? 1.4 : kind === 'end' ? 1.7 : 1;
+  const v = kind === 'lead' ? 0.6 : kind === 'normal' ? 0.8 : 1;
+  SOUNDS[c.sound].play(t, m, v);
+}
+
+// Voices: every English voice on the phone, Australian first
+const quality = v => /premium/i.test(v.voiceURI || '') ? 2 : /enhanced/i.test(v.voiceURI || '') ? 1 : 0;
+function voiceLabel(v) {
+  const q = quality(v);
+  return v.name + ' (' + v.lang.replace('_', '-') + ')' + (q === 2 ? ' Premium' : q === 1 ? ' Enhanced' : '');
+}
+let shownVoices = [];
+function loadVoices() {
+  if (!('speechSynthesis' in window)) return;
+  const vs = speechSynthesis.getVoices().filter(v => v.lang.toLowerCase().startsWith('en'));
+  if (!vs.length) return;
+  const au = v => v.lang.replace('_', '-') === 'en-AU';
+  vs.sort((a, b) => au(b) - au(a));
+  shownVoices = vs;
+  const sel = $('#voice');
+  sel.innerHTML = vs.map((v, i) => '<option value="' + i + '">' + voiceLabel(v) + '</option>').join('');
+  const chosen = vs.find(v => v.voiceURI === c.voiceURI) || vs.find(v => v.name === c.voiceName) || vs[0];
+  c.voiceURI = chosen.voiceURI;
+  c.voiceName = chosen.name;
+  sel.value = String(vs.indexOf(chosen));
+}
+if ('speechSynthesis' in window) {
+  loadVoices();
+  speechSynthesis.onvoiceschanged = loadVoices;
+}
+let speakToken = 0, cueUntil = 0;
+function speak(text, force, rate, cue) {
+  if ((!c.voice && !force) || !('speechSynthesis' in window)) return;
+  const ss = speechSynthesis, ep = speakToken;
+  const run = () => {
+    if (ep !== speakToken) return;
+    const u = new SpeechSynthesisUtterance(text);
+    const all = ss.getVoices();
+    const v = all.find(x => x.voiceURI === c.voiceURI) || all.find(x => x.name === c.voiceName);
+    if (v) u.voice = v;
+    u.rate = rate || (force ? 1.25 : 1.15);
+    ss.speak(u);
+  };
+  // a rep call never cuts off a beat word, and the next beat word waits for the call instead of cutting it off
+  if (cue) { cueUntil = performance.now() + 350 + text.length * 60; run(); return; }
+  if (performance.now() < cueUntil) { run(); return; }
+  // iPhone Safari drops speech that starts in the same instant as a cancel, so leave a short gap
+  if (ss.speaking || ss.pending) { ss.cancel(); setTimeout(run, 60); } else run();
+}
+
+// Settings sheet
+$('#sound').innerHTML = Object.keys(SOUNDS).map(k => '<option value="' + k + '">' + SOUNDS[k].name + '</option>').join('');
+$('#sound').value = c.sound;
+$('#cog').onclick = () => $('#modal').classList.add('open');
+$('#done').onclick = () => $('#modal').classList.remove('open');
+$('#modal').addEventListener('click', e => { if (e.target.id === 'modal') $('#modal').classList.remove('open'); });
+$('#voiceOn').onchange = e => { c.voice = e.target.checked; save(); };
+$('#tickOn').onchange = e => { c.tick = e.target.checked; save(); };
+$('#cueRep').onchange = e => { c.cueRep = e.target.checked; save(); };
+$('#cueHalf').onchange = e => { c.cueHalf = e.target.checked; save(); };
+$('#cueLast').onchange = e => { c.cueLast = e.target.checked; save(); };
+$('#voice').onchange = e => {
+  const v = shownVoices[Number(e.target.value)];
+  if (!v) return;
+  c.voiceURI = v.voiceURI; c.voiceName = v.name; save();
+  speak('Down, 2, 3', true, 1.05);
+};
+$('#sound').onchange = e => {
+  c.sound = e.target.value; save();
+  ensureCtx();
+  const t = ctx.currentTime + 0.05;
+  playSound(t, 'accent');
+  playSound(t + 0.5, 'normal');
+  playSound(t + 1.0, 'normal');
+};
+
+// Reset settings: tap twice (the first tap arms it, so a stray tap does nothing)
+let resetTimer = 0;
+function disarmReset() {
+  clearTimeout(resetTimer);
+  const b = $('#reset');
+  b.textContent = 'Reset settings';
+  b.classList.remove('armed');
+}
+$('#reset').onclick = () => {
+  const b = $('#reset');
+  if (!b.classList.contains('armed')) {
+    b.textContent = 'Tap again to reset everything';
+    b.classList.add('armed');
+    resetTimer = setTimeout(disarmReset, 3000);
+    return;
+  }
+  disarmReset();
+  const keep = c.saved; // saved exercises are your content, not settings, so a reset leaves them alone
+  c = Object.assign({}, defaults);
+  c.saved = keep;
+  c.preset = 'custom';
+  snap();
+  loadVoices();
+  syncSettings();
+  render();
+  setBpm(c.bpm);
+  $('#sound').value = c.sound;
+  save();
+};
+$('#done').addEventListener('click', disarmReset);
+$('#modal').addEventListener('click', e => { if (e.target.id === 'modal') disarmReset(); });
+
+// Rest stopwatch (counts up on the home screen after a set)
+let swStart = 0, swTimer = 0;
+function swShow() {
+  const s = Math.floor((Date.now() - swStart) / 1000);
+  $('#sw').textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+function swBegin() {
+  swStart = Date.now();
+  $('#sw').style.display = 'block';
+  swShow();
+  clearInterval(swTimer);
+  swTimer = setInterval(swShow, 500);
+}
+function swClear() {
+  clearInterval(swTimer);
+  $('#sw').style.display = 'none';
+}
+$('#sw').onclick = swClear;
+
+// Beat sequence. Every beat has pi (position in its phase), len (phase length) and dur (seconds)
+function buildBeats() {
+  const phases = c.startDown
+    ? [['Down', c.pd], ['Hold', c.hd], ['Up', c.pu], ['Hold', c.hu]]
+    : [['Up', c.pu], ['Hold', c.hu], ['Down', c.pd], ['Hold', c.hd]];
+  const b = [];
+  for (let i = c.delay; i >= 1; i--) {
+    b.push({ say: String(i), big: String(i), num: '', lead: true, pi: c.delay - i + 1, len: c.delay, dur: spb });
+  }
+  for (let r = 1; r <= c.reps; r++) {
+    phases.forEach(([name, len]) => {
+      for (let k = 1; k <= len; k++) {
+        b.push({ say: k === 1 ? name : String(k), big: name, num: k, rep: r, start: k === 1, pi: k, len: len, dur: spb });
+      }
+    });
+    const last = b[b.length - 1];
+    const parts = [];
+    if (c.cueRep) parts.push(r + (r === 1 ? ' rep' : ' reps'));
+    if (c.cueHalf && c.reps >= 4 && r === Math.ceil(c.reps / 2) && r < c.reps) parts.push('Halfway');
+    if (c.cueLast && c.reps >= 2 && r === c.reps - 1) parts.push('Last rep');
+    if (parts.length) last.after = parts.join(', ');
+  }
+  b.push({ say: 'Done', big: 'Done', num: '', end: true, pi: 1, len: 1, dur: spb });
+  // Running total of the set so the outer ring can track overall progress
+  let t = 0;
+  b.forEach(x => { if (x.rep) { x.cum = t; t += x.dur; } });
+  setTotal = t || 1;
+  return b;
+}
+
+function colour(b) {
+  if (b.lead) return '#9a9aa0';
+  if (b.big === 'Down') return '#ff8a3d';
+  if (b.big === 'Up') return '#8ae65c';
+  return '#d8d8de';
+}
+
+// Inner ring: one segment per beat in the current phase
+const R_IN = 58, C_IN = 2 * Math.PI * R_IN, C_OUT = 2 * Math.PI * 72;
+let ringN = 0, segL = 0, progEls = [];
+function buildRing(n) {
+  if (n === ringN) return;
+  ringN = n;
+  const gap = n > 1 ? 5 : 0, span = 360 / n;
+  segL = C_IN * (span - gap) / 360;
+  let tracks = '', fills = '';
+  for (let i = 0; i < n; i++) {
+    const a = (i * span + gap / 2).toFixed(2);
+    tracks += '<circle class="st" cx="80" cy="80" r="' + R_IN + '" stroke-dasharray="' + segL + ' ' + C_IN + '" transform="rotate(' + a + ' 80 80)"/>';
+    fills += '<circle class="sp" cx="80" cy="80" r="' + R_IN + '" stroke-dasharray="0 ' + C_IN + '" transform="rotate(' + a + ' 80 80)"/>';
+  }
+  $('#segs').innerHTML = tracks + fills;
+  progEls = Array.from($('#segs').querySelectorAll('.sp'));
+}
+
+function show(b) {
+  $('#big').textContent = b.big;
+  $('#num').textContent = b.num;
+  $('#rep').textContent = b.end ? 'Set complete' : b.rep ? 'Rep ' + b.rep + ' / ' + c.reps : 'Get ready';
+  $('#live').style.setProperty('--ph', colour(b));
+  buildRing(b.len);
+}
+
+function playBeat(b, t, i) {
+  const kind = b.lead ? 'lead' : b.end ? 'end' : b.start ? 'accent' : 'normal';
+  if (c.tick) playSound(t, kind);
+  const ms = Math.max(0, (t - ctx.currentTime) * 1000);
+  uiTimers.push(setTimeout(() => {
+    if (!running || paused) return;
+    shownIdx = i;
+    cur = { b: b, t: t };
+    if (b.rep || b.end) reachedSet = true;
+    show(b);
+    if (b.say) speak(b.say);
+  }, ms));
+  if (b.after) {
+    // rep and cue calls land halfway between this beat and the next
+    const at = Math.max(0, (t - ctx.currentTime) * 1000 + b.dur * 450);
+    uiTimers.push(setTimeout(() => {
+      if (!running || paused) return;
+      speak(b.after, true, 1.25, true);
+    }, at));
+  }
+}
+
+function schedule() {
+  while (idx < beats.length && nextTime < ctx.currentTime + 0.12) {
+    const b = beats[idx];
+    playBeat(b, nextTime, idx);
+    nextTime += b.dur;
+    idx++;
+  }
+  if (idx >= beats.length && ctx.currentTime > nextTime + 0.3) stop();
+}
+
+function tickRing() {
+  raf = requestAnimationFrame(tickRing);
+  if (!cur || paused) return;
+  const b = cur.b;
+  const frac = Math.min(1, Math.max(0, (ctx.currentTime - cur.t) / b.dur));
+  const p = ((b.pi - 1) + frac) / b.len;
+  for (let i = 0; i < ringN; i++) {
+    const f = Math.min(1, Math.max(0, p * ringN - i));
+    progEls[i].setAttribute('stroke-dasharray', (segL * f) + ' ' + C_IN);
+  }
+  let op;
+  if (b.keep) op = lastOp;
+  else if (b.rep) op = (b.cum + frac * b.dur) / setTotal;
+  else op = b.end ? 1 : 0;
+  lastOp = Math.min(1, op);
+  $('#oprog').style.strokeDashoffset = C_OUT * (1 - lastOp);
+}
+
+const PAUSE_SVG = '<svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>';
+const PLAY_SVG = '<svg viewBox="0 0 24 24"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></svg>';
+
+async function lockScreen() {
+  try { if ('wakeLock' in navigator) wake = await navigator.wakeLock.request('screen'); } catch (e) {}
+}
+
+function start() {
+  mStop();
+  ensureCtx();
+  if ('speechSynthesis' in window) {
+    const p = new SpeechSynthesisUtterance(' ');
+    p.volume = 0;
+    speechSynthesis.speak(p);
+  }
+  swClear();
+  spb = 60 / c.bpm;
+  beats = buildBeats();
+  idx = 0;
+  shownIdx = 0;
+  cur = null;
+  lastOp = 0;
+  reachedSet = false;
+  paused = false;
+  nextTime = ctx.currentTime + 0.2;
+  running = true;
+  document.body.classList.remove('paused');
+  document.body.classList.add('running');
+  $('#big').textContent = '';
+  $('#num').textContent = '';
+  $('#rep').textContent = '';
+  $('#pico').innerHTML = PAUSE_SVG;
+  ringN = 0;
+  $('#segs').innerHTML = '';
+  $('#oprog').style.strokeDashoffset = C_OUT;
+  $('#live').style.setProperty('--ph', '#9a9aa0');
+  timer = setInterval(schedule, 25);
+  cancelAnimationFrame(raf);
+  raf = requestAnimationFrame(tickRing);
+  lockScreen();
+}
+
+function pause() {
+  paused = true;
+  clearInterval(timer);
+  uiTimers.forEach(clearTimeout);
+  uiTimers = [];
+  speakToken++; if ('speechSynthesis' in window) speechSynthesis.cancel();
+  document.body.classList.add('paused');
+  $('#pico').innerHTML = PLAY_SVG;
+  $('#rep').textContent = 'Paused';
+}
+
+function resume() {
+  paused = false;
+  document.body.classList.remove('paused');
+  $('#pico').innerHTML = PAUSE_SVG;
+  let at = shownIdx;
+  const cb = beats[at];
+  if (cb && cb.lead && !cb.keep) {
+    at = 0; // paused in the start delay: run it again from the top
+  } else if (cb && !cb.end) {
+    if (cb.keep) { while (beats[at] && beats[at].keep) at++; } // paused inside a resume countdown
+    const rep = beats[at] && beats[at].rep;
+    while (rep && at > 0 && beats[at - 1].rep === rep) at--; // back to the first beat of this rep
+    const cd = [3, 2, 1].map((n, i) => ({ say: String(n), big: String(n), num: '', lead: true, keep: true, pi: i + 1, len: 3, dur: spb }));
+    beats.splice(at, 0, ...cd);
+  }
+  idx = at;
+  nextTime = ctx.currentTime + 0.2;
+  timer = setInterval(schedule, 25);
+}
+
+function togglePause() {
+  if (!running) return;
+  if (paused) resume(); else pause();
+}
+
+function stop() {
+  const didSet = reachedSet;
+  running = false;
+  paused = false;
+  clearInterval(timer);
+  cancelAnimationFrame(raf);
+  uiTimers.forEach(clearTimeout);
+  uiTimers = [];
+  speakToken++; if ('speechSynthesis' in window) speechSynthesis.cancel();
+  if (wake) { try { wake.release(); } catch (e) {} wake = null; }
+  document.body.classList.remove('running');
+  document.body.classList.remove('paused');
+  if (didSet) swBegin();
+}
+
+// Metronome: standalone steady beat using the beat sound chosen in settings
+let mOn = false, mTimer = 0, mNext = 0, mwake = null;
+function mHit() {
+  const el = $('#mbpm');
+  el.classList.add('hit');
+  setTimeout(() => el.classList.remove('hit'), 90);
+}
+function mSchedule() {
+  while (mNext < ctx.currentTime + 0.12) {
+    const t = mNext;
+    playSound(t, 'normal');
+    setTimeout(() => { if (mOn) mHit(); }, Math.max(0, (t - ctx.currentTime) * 1000));
+    mNext += 60 / c.bpm;
+  }
+}
+async function mLock() {
+  try { if ('wakeLock' in navigator) mwake = await navigator.wakeLock.request('screen'); } catch (e) {}
+}
+function mUi() {
+  $('#mPlay').innerHTML = mOn ? PAUSE_SVG : PLAY_SVG;
+  $('#met').classList.toggle('on', mOn);
+}
+function mStart() {
+  if (mOn || running) return;
+  ensureCtx();
+  mOn = true;
+  mNext = ctx.currentTime + 0.1;
+  mTimer = setInterval(mSchedule, 25);
+  mLock();
+  mUi();
+}
+function mStop() {
+  if (!mOn) return;
+  mOn = false;
+  clearInterval(mTimer);
+  if (mwake) { try { mwake.release(); } catch (e) {} mwake = null; }
+  mUi();
+}
+function holdRepeat(btn, d) {
+  let t1 = 0, t2 = 0;
+  const end = () => { clearTimeout(t1); clearInterval(t2); };
+  btn.addEventListener('pointerdown', () => {
+    setBpm(c.bpm + d);
+    t1 = setTimeout(() => { t2 = setInterval(() => setBpm(c.bpm + d), 70); }, 400);
+  });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => btn.addEventListener(ev, end));
+  btn.addEventListener('click', e => { if (e.detail === 0) setBpm(c.bpm + d); }); // keyboard
+}
+holdRepeat($('#mDn'), -1);
+holdRepeat($('#mUp'), 1);
+$('#mSlide').oninput = e => setBpm(Number(e.target.value));
+$('#mPlay').onclick = () => { if (mOn) mStop(); else mStart(); };
+$('#met').onclick = () => $('#mmodal').classList.add('open');
+function closeMet() { mStop(); $('#mmodal').classList.remove('open'); }
+$('#mDone').onclick = closeMet;
+$('#mmodal').addEventListener('click', e => { if (e.target.id === 'mmodal') closeMet(); });
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (running) lockScreen();
+  if (mOn) mLock();
+});
+$('#play').onclick = start;
+$('#pause').onclick = togglePause;
+$('#stop').onclick = stop;
+if (!c.custom) snap();
+// a saved preset only counts if the values still match it
+{ const cur = curExercise(); if (cur === 'custom' || !matches(lookup(cur))) c.preset = 'custom'; }
+syncSettings();
+render();
+delete c.mbpm;
+setBpm(c.bpm);
+mUi();
+
+// Offline support (only when served over http or https)
+if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+}
+</script>
+</body>
+</html>
