@@ -419,8 +419,16 @@ holdRepeat($('#bpmUp'), 1);
 let ctx, timer, nextTime, idx, beats, spb, setTotal = 1, running = false, paused = false;
 let uiTimers = [], wake = null, cur = null, shownIdx = 0, raf = 0, lastOp = 0, reachedSet = false;
 function ensureCtx() {
-  ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
-  if (ctx.state === 'suspended') ctx.resume();
+  if (!ctx) {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    // iPhone Safari moves the context to 'interrupted' (not 'suspended') when another app such as Spotify takes the audio, so retry on any non-running state
+    ctx.onstatechange = () => { if ((running && !paused) || mOn) kickCtx(); };
+  }
+  kickCtx();
+}
+function kickCtx() {
+  if (!ctx || ctx.state === 'running') return;
+  try { const p = ctx.resume(); if (p && p.catch) p.catch(() => {}); } catch (e) {}
 }
 
 // Beat sounds. m = pitch multiplier, v = volume multiplier
@@ -687,6 +695,7 @@ function playBeat(b, t, i) {
 }
 
 function schedule() {
+  if (ctx.state !== 'running') { kickCtx(); return; } // audio clock is frozen, wait for it instead of stalling silently
   while (idx < beats.length && nextTime < ctx.currentTime + 0.12) {
     const b = beats[idx];
     playBeat(b, nextTime, idx);
@@ -815,6 +824,7 @@ function mHit() {
   setTimeout(() => el.classList.remove('hit'), 90);
 }
 function mSchedule() {
+  if (ctx.state !== 'running') { kickCtx(); return; }
   while (mNext < ctx.currentTime + 0.12) {
     const t = mNext;
     playSound(t, 'normal');
@@ -868,6 +878,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
   if (running) lockScreen();
   if (mOn) mLock();
+  if (running || mOn) kickCtx();
 });
 $('#play').onclick = start;
 $('#pause').onclick = togglePause;
