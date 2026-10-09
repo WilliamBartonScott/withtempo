@@ -14,7 +14,8 @@
 <title>WithTempo</title>
 <style>
   :root { --bg:#000; --fg:#fff; --mut:#9a9aa0; --btn:#2c2c2e; --acc:#ffb23e; --ph:#9a9aa0; --w:380px; }
-  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+  button { user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
   html,body { margin:0; background:var(--bg); color:var(--fg);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
   body { min-height:100dvh; padding:env(safe-area-inset-top) 20px env(safe-area-inset-bottom); }
@@ -124,6 +125,9 @@
   .sinfo { color:var(--mut); font-size:13px; margin:6px 0 2px; min-height:1.4em; }
   .serr { color:#ff6b6b; font-size:14px; margin:0 0 12px; min-height:1.3em; }
   .done { display:block; width:100%; height:50px; border:0; border-radius:14px; background:var(--acc); color:#1c1400; font-size:18px; font-weight:700; }
+  #rot { display:none; position:fixed; inset:0; z-index:9999; background:#000; color:var(--mut); flex-direction:column; align-items:center; justify-content:center; gap:10px; font-size:18px; text-align:center; }
+  #rot svg { width:44px; height:44px; fill:none; stroke:var(--mut); stroke-width:1.6; }
+  @media (orientation:landscape) and (max-height:500px) { #rot { display:flex; } }
 </style>
 </head>
 <body>
@@ -213,6 +217,7 @@
   </div>
 </div>
 
+<div id="rot"><svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg><div>Turn your phone upright</div></div>
 <script>
 const $ = s => document.querySelector(s);
 const defaults = { reps:8, delay:5, bpm:60, pd:3, hd:2, pu:3, hu:2, startDown:true,
@@ -418,7 +423,13 @@ holdRepeat($('#bpmUp'), 1);
 // Audio context
 let ctx, timer, nextTime, idx, beats, spb, setTotal = 1, running = false, paused = false;
 let uiTimers = [], wake = null, cur = null, shownIdx = 0, raf = 0, lastOp = 0, reachedSet = false;
+function freshCtx() {
+  if (ctx) { try { ctx.onstatechange = null; ctx.close(); } catch (e) {} }
+  ctx = null; noiseBuf = null;
+}
 function ensureCtx() {
+  // an 'interrupted' or 'closed' context (phone call, Spotify, long background) can stay dead on iPhone, so build a new one inside the tap
+  if (ctx && (ctx.state === 'interrupted' || ctx.state === 'closed')) freshCtx();
   if (!ctx) {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
     // iPhone Safari moves the context to 'interrupted' (not 'suspended') when another app such as Spotify takes the audio, so retry on any non-running state
@@ -763,6 +774,11 @@ function start() {
   cancelAnimationFrame(raf);
   raf = requestAnimationFrame(tickRing);
   lockScreen();
+  // if the audio clock never starts, don't sit on a blank screen: drop the dead context and go back so the next tap builds a fresh one
+  const mine = ctx;
+  setTimeout(() => {
+    if (running && !paused && shownIdx === 0 && !cur && ctx === mine && ctx.state !== 'running') { freshCtx(); stop(); }
+  }, 1500);
 }
 
 function pause() {
@@ -891,6 +907,8 @@ render();
 delete c.mbpm;
 setBpm(c.bpm);
 mUi();
+
+try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(() => {}); } catch (e) {}
 
 // Offline support (only when served over http or https)
 if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
