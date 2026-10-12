@@ -132,7 +132,8 @@
 </head>
 <body>
 <header>
-  <div class="hl"><button class="sw" id="sw" aria-label="Rest stopwatch, tap to clear">0:00</button></div>
+  <div class="hl"><button class="hbtn" id="swb" aria-label="Stopwatch"><svg viewBox="0 0 24 24"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 13.5V9.5M9.5 3h5M12 3v3M18.5 6.5l1.2-1.2"/></svg></button>
+    <button class="sw" id="sw" aria-label="Rest stopwatch, tap to clear">0:00</button></div>
   <h1>WithTempo</h1>
   <div class="hr">
     <button class="hbtn" id="met" aria-label="Metronome"><svg viewBox="0 0 24 24"><path d="M8.5 3h7l4 18h-15z"/><path d="M12 17l3.5-9.5"/></svg></button>
@@ -179,11 +180,8 @@
     <h3>How it works</h3>
     <ul class="hint">
       <li>Phase lengths are in beats. At 60 BPM, 1 beat = 1 second.</li>
-      <li>Each rep runs down, hold, up, hold. Tap Down or Up to choose which one it starts on.</li>
-      <li>Rep and cue calls play between beats.</li>
+      <li>Tap Down or Up to choose which one a rep starts on.</li>
       <li>Pausing restarts the current rep after a 3-2-1.</li>
-      <li>After a set, the stopwatch times your rest. Tap it to clear.</li>
-      <li>The metronome stops when you close it and uses the BPM from settings.</li>
       <li>Turn off silent mode so beats play on iPhone.</li>
       <li>For more voices: Settings, Accessibility, Spoken Content, Voices.</li>
     </ul>
@@ -253,13 +251,14 @@ const rows = [
   ['hu','Hold',0,20,1]
 ];
 
-// Starting points based on common tempo prescriptions. They set the four phase lengths (in beats) and which movement opens each rep. Reps and start delay are left alone.
+// Starting points. They set the four phase lengths (in beats) and which movement opens each rep. Reps and start delay are left alone.
 const PRESETS = [
-  { name:'Pull Ups', pd:3, hd:1, pu:2, hu:1, startDown:false },
-  { name:'Dips',     pd:3, hd:1, pu:2, hu:1, startDown:true  },
-  { name:'Rows',     pd:3, hd:0, pu:2, hu:1, startDown:false },
-  { name:'Push Ups', pd:3, hd:1, pu:1, hu:0, startDown:true  },
-  { name:'Squats',   pd:3, hd:2, pu:1, hu:0, startDown:true  }
+  { name:'Pull Ups',   pd:3, hd:2, pu:3, hu:2, startDown:false },
+  { name:'Dips',       pd:3, hd:2, pu:3, hu:2, startDown:true  },
+  { name:'Rows',       pd:2, hd:1, pu:2, hu:1, startDown:false },
+  { name:'Push Ups',   pd:2, hd:1, pu:2, hu:1, startDown:true  },
+  { name:'Squats',     pd:3, hd:2, pu:2, hu:1, startDown:true  },
+  { name:'Leg Raises', pd:3, hd:1, pu:2, hu:2, startDown:false }
 ];
 // Custom stays selected once you edit any of the four tempo controls, even if the numbers happen to equal a preset
 const matches = p => c.pd === p.pd && c.hd === p.hd && c.pu === p.pu && c.hu === p.hu && c.startDown === p.startDown;
@@ -609,6 +608,7 @@ function swShow() {
 }
 function swBegin() {
   swStart = Date.now();
+  $('#swb').style.display = 'none';
   $('#sw').style.display = 'block';
   swShow();
   clearInterval(swTimer);
@@ -616,9 +616,11 @@ function swBegin() {
 }
 function swClear() {
   clearInterval(swTimer);
+  $('#swb').style.display = '';
   $('#sw').style.display = 'none';
 }
 $('#sw').onclick = swClear;
+$('#swb').onclick = swBegin;
 
 // Beat sequence. Every beat has pi (position in its phase), len (phase length) and dur (seconds)
 function buildBeats() {
@@ -743,6 +745,7 @@ async function lockScreen() {
 
 function start() {
   mStop();
+  freshCtx(); // a new audio engine for every set: iPhone can leave an old one with a frozen clock after the app has been in the background
   ensureCtx();
   if ('speechSynthesis' in window) {
     const p = new SpeechSynthesisUtterance(' ');
@@ -777,7 +780,7 @@ function start() {
   // if the audio clock never starts, don't sit on a blank screen: drop the dead context and go back so the next tap builds a fresh one
   const mine = ctx;
   setTimeout(() => {
-    if (running && !paused && shownIdx === 0 && !cur && ctx === mine && ctx.state !== 'running') { freshCtx(); stop(); }
+    if (running && !paused && !cur && ctx === mine) { freshCtx(); stop(); } // first beat is due after 0.2s, so nothing on screen by now means the audio clock is dead
   }, 1500);
 }
 
@@ -857,6 +860,7 @@ function mUi() {
 }
 function mStart() {
   if (mOn || running) return;
+  freshCtx();
   ensureCtx();
   mOn = true;
   mNext = ctx.currentTime + 0.1;
